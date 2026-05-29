@@ -122,17 +122,3 @@ Thin entry point that batch-processes all `.mp4` files in a directory using `det
 | `conf` | `run.py` / `detector.py` | Detection confidence threshold (default `0.5`) |
 
 ---
-
-## 📊 Dataset
-
-- **Source:** [Roboflow](https://roboflow.com)
-- **Workspace:** `mohamed-90rl9`
-- **Project:** `tail-clamp-detection`
-- **Version:** 2
-- **Format:** YOLOv11
-
----
-
-## 📄 License
-
-This project is for research and educational use.
