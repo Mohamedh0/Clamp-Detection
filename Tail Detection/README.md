@@ -2,6 +2,7 @@
 
 A YOLOv11-based computer vision system that detects **tail clamps** or **internal head of clamps** in video footage, measures distances between them, and produces annotated output videos.
 
+**[Output Videos](https://drive.google.com/drive/folders/1ZrzVRBUjZldc0StWBcC0B9_5H5b9Hen4?usp=sharing)**
 ---
 
 ## 📁 Project Structure
