@@ -1,6 +1,6 @@
-# 🐄 Tail Clamp Detection
+# Tail Clamp Detection
 
-A YOLOv11-based computer vision system that detects **tail clamps** and **tails** in video footage, measures distances between them, and produces annotated output videos.
+A YOLOv11-based computer vision system that detects **tail clamps** or **internal head of clamps** in video footage, measures distances between them, and produces annotated output videos.
 
 ---
 
@@ -88,8 +88,8 @@ Each frame is passed through the YOLOv11 model, which detects two classes:
 
 The following measurements are computed per frame and drawn on the annotated video:
 
-- **Short–Long Tail distance** — Euclidean distance between the shortest and longest detected tail (based on bounding box diagonal), drawn in **orange**.
-- **Short Tail–Nearest Clamp distance** — Euclidean distance from the shortest tail to the closest clamp, drawn in **cyan**.
+- **Short–Long Tail distance** — Euclidean distance between the shortest and longest detected tail (based on bounding box diagonal), drawn in.
+- **Short Tail–Nearest Clamp distance** — Euclidean distance from the shortest tail to the closest clamp, drawn in.
 
 A HUD in the top-left corner shows live counts and distances.
 
