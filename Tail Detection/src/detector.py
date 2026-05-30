@@ -12,7 +12,6 @@ def load_model(weights_path: str) -> YOLO:
 # ─────────────────────────────────────────────
 
 def get_center(box):
-
     x1, y1, x2, y2 = box.xyxy[0].tolist()
 
     return (
@@ -22,25 +21,31 @@ def get_center(box):
 
 
 def euclidean(p1, p2):
-
     return np.sqrt(
         (p1[0] - p2[0]) ** 2 +
         (p1[1] - p2[1]) ** 2
     )
 
 
-def tail_diagonal(box):
+def tail_score(box):
+    """
+    Lower score = physically longer tail.
+
+    Sorts by top Y position.
+    Small YOLO jitters are smoothed using
+    rounding to nearest 10 pixels.
+    """
 
     x1, y1, x2, y2 = box.xyxy[0].tolist()
 
-    return np.sqrt(
-        (x2 - x1) ** 2 +
-        (y2 - y1) ** 2
-    )
+    h = y2 - y1
+
+    rounded_y1 = round(y1 / 10.0) * 10.0
+
+    return (rounded_y1, h)
 
 
 def box_center_x(box):
-
     x1, _, x2, _ = box.xyxy[0].tolist()
 
     return (x1 + x2) / 2
@@ -54,14 +59,13 @@ def draw_hud(frame, rows):
 
     frame_h = frame.shape[0]
 
-    font       = cv2.FONT_HERSHEY_SIMPLEX
+    font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 1.0
-    thickness  = 2
+    thickness = 2
 
-    pad      = 18
+    pad = 18
     line_gap = 40
 
-    # FULL text size
     sizes = [
         cv2.getTextSize(
             f"{label}: {text}",
@@ -82,7 +86,6 @@ def draw_hud(frame, rows):
 
     overlay = frame.copy()
 
-    # background
     cv2.rectangle(
         overlay,
         (x0, y0),
@@ -100,7 +103,6 @@ def draw_hud(frame, rows):
         frame
     )
 
-    # border
     cv2.rectangle(
         frame,
         (x0, y0),
@@ -109,16 +111,13 @@ def draw_hud(frame, rows):
         2
     )
 
-    # text
     for i, (label, text, color) in enumerate(rows):
 
         ty = y0 + pad + (i + 1) * line_gap - 6
 
-        full_text = f"{label}: {text}"
-
         cv2.putText(
             frame,
-            full_text,
+            f"{label}: {text}",
             (x0 + pad, ty),
             font,
             font_scale,
@@ -138,9 +137,6 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
 
     result = results[0]
 
-    # class 0 = clamp
-    # class 1 = tail
-
     clamps = [
         box for box in result.boxes
         if int(box.cls) == 0
@@ -152,51 +148,43 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
     ]
 
     clamp_count = len(clamps)
-    tail_count  = len(tails)
+    tail_count = len(tails)
 
     annotated_frame = result.plot()
-
-    # ─────────────────────────────────────────
-    # Sort clamps
-    # ─────────────────────────────────────────
 
     clamps_sorted = sorted(
         clamps,
         key=box_center_x
     )
 
-    # ─────────────────────────────────────────
-    # Shortest tail
-    # ─────────────────────────────────────────
+    sorted_tails = sorted(
+        tails,
+        key=tail_score
+    )
 
-    shortest_tail = None
+    longest_tail = (
+        sorted_tails[0]
+        if len(sorted_tails) >= 1
+        else None
+    )
 
-    if tails:
+    shortest_tail = (
+        sorted_tails[-1]
+        if len(sorted_tails) >= 1
+        else None
+    )
 
-        shortest_tail = min(
-            tails,
-            key=tail_diagonal
-        )
-
-    # ─────────────────────────────────────────
+    # ─────────────────────────────────────
     # Distance:
     # shortest tail ↔ longest tail
-    # ─────────────────────────────────────────
+    # ─────────────────────────────────────
 
     dist_tails_text = "N/A"
 
-    if len(tails) >= 2:
+    if len(sorted_tails) >= 2:
 
-        sorted_tails = sorted(
-            tails,
-            key=tail_diagonal
-        )
-
-        shortest = sorted_tails[0]
-        longest  = sorted_tails[-1]
-
-        shortest_center = get_center(shortest)
-        longest_center  = get_center(longest)
+        shortest_center = get_center(shortest_tail)
+        longest_center = get_center(longest_tail)
 
         tail_distance = euclidean(
             shortest_center,
@@ -205,7 +193,6 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
 
         dist_tails_text = f"{tail_distance:.1f}px"
 
-        # draw line
         cv2.line(
             annotated_frame,
             (
@@ -220,7 +207,6 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
             2
         )
 
-        # midpoint
         mid = (
             int(
                 (shortest_center[0] + longest_center[0]) / 2
@@ -240,12 +226,12 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
             2
         )
 
-    # ─────────────────────────────────────────
+    # ─────────────────────────────────────
     # Distance:
     # shortest tail → nearest RIGHT clamp
-    # ─────────────────────────────────────────
+    # ─────────────────────────────────────
 
-    dist_clamp_text = "N/A"
+    dist_before_text = "N/A"
 
     if shortest_tail is not None and len(clamps_sorted) > 0:
 
@@ -253,7 +239,6 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
 
         tail_x = tail_center[0]
 
-        # clamps on RIGHT side
         right_clamps = [
             c for c in clamps_sorted
             if box_center_x(c) > tail_x
@@ -276,9 +261,8 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
                 clamp_center
             )
 
-            dist_clamp_text = f"{distance:.1f}px"
+            dist_before_text = f"{distance:.1f}px"
 
-            # draw line
             cv2.line(
                 annotated_frame,
                 (
@@ -293,7 +277,6 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
                 2
             )
 
-            # midpoint
             mid = (
                 int(
                     (tail_center[0] + clamp_center[0]) / 2
@@ -305,17 +288,13 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
 
             cv2.putText(
                 annotated_frame,
-                dist_clamp_text,
+                dist_before_text,
                 (mid[0], mid[1] - 8),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
                 (0, 255, 255),
                 2
             )
-
-    # ─────────────────────────────────────────
-    # HUD
-    # ─────────────────────────────────────────
 
     rows = [
         (
@@ -334,8 +313,8 @@ def process_frame(model: YOLO, frame, conf: float = 0.5):
             (255, 165, 0)
         ),
         (
-            "Tail→Clamp Before",
-            dist_clamp_text,
+            "Tail-Clamp Before",
+            dist_before_text,
             (0, 255, 255)
         ),
     ]
@@ -366,9 +345,9 @@ def save_video_detection(
             f"Cannot open video: {video_path}"
         )
 
-    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps    = int(cap.get(cv2.CAP_PROP_FPS)) or 30
+    fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
 
     out = cv2.VideoWriter(
         f"{output_name}.mp4",
@@ -386,13 +365,13 @@ def save_video_detection(
             if not ret:
                 break
 
-            annotated = process_frame(
+            annotated_frame = process_frame(
                 model,
                 frame,
-                conf=conf
+                conf
             )
 
-            out.write(annotated)
+            out.write(annotated_frame)
 
     finally:
 
